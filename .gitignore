@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Environment / secrets
+.env
+.env.local
+
+# Docker
+*.log
+
+# Postgres data (if you mount a local volume)
+pgdata/
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Langfuse / misc local state
+*.sqlite3
