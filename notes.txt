@@ -7,3 +7,6 @@ MSYS_NO_PATHCONV=1 docker run --name ecommerce-return-agent-postgres \
   -p 5432:5432 \
   -v $(pwd)/db:/docker-entrypoint-initdb.d \
   -d postgres
+
+## Re-starting the container that I created
+docker start ecommerce-return-agent-postgres

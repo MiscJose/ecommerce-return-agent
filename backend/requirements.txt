@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+langgraph
+langchain-anthropic
+psycopg2-binary
+python-dotenv
+langfuse
