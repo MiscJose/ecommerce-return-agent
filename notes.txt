@@ -1,12 +1,21 @@
-docker rm -f ecommerce-return-agent-postgres
 
 MSYS_NO_PATHCONV=1 docker run --name ecommerce-return-agent-postgres \
   -e POSTGRES_PASSWORD=password \
   -e POSTGRES_DB=ecommerce_db \
   -e POSTGRES_USER=admin \
   -p 5432:5432 \
-  -v $(pwd)/db:/docker-entrypoint-initdb.d \
+  -v $(pwd)/backend/db:/docker-entrypoint-initdb.d \
   -d postgres
+
+## Restart Image
+docker rm -f ecommerce-return-agent-postgres
 
 ## Re-starting the container that I created
 docker start ecommerce-return-agent-postgres
+
+## Build Image
+docker build -t ecommerce-backend ./backend
+## Run Image
+docker run -p 8000:8000 ecommerce-backend
+or
+docker run -p 8000:8000 --env-file ./backend/.env ecommerce-backend
