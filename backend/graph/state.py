@@ -4,8 +4,6 @@ from decimal import Decimal
 from typing import TypedDict, Annotated
 from langchain.messages import AnyMessage
 from langgraph.graph.message import add_messages
-from langgraph.graph import END, START, StateGraph
-
 
 class ReturnState(TypedDict):
    order_id: int
@@ -34,37 +32,4 @@ default_return_state = {
    "messages": []
 }
 
-def order_finder(state: ReturnState) -> ReturnState:
-   print("Function order_finder")
-   return {}
 
-def eligibility_gate(state: ReturnState) -> ReturnState:
-   print("Function eligibility_gate")
-   return {}
-
-def escalation_gate(state: ReturnState) -> ReturnState:
-   print("Function escalation_gate")
-   return {}
-
-def finalize_return(state: ReturnState) -> ReturnState:
-   print("Function finalize_return")
-   return {}
-
-def route_eligibility(state: ReturnState) -> str:
-   print("Function route_eligibility")
-   return "eligible"
-
-builder = StateGraph(ReturnState)
-
-builder.add_node("order_finder", order_finder)
-builder.add_node("eligibility_gate", eligibility_gate)
-builder.add_node("escalation_gate", escalation_gate)
-builder.add_node("finalize_return", finalize_return)
-
-builder.add_edge(START, "order_finder")
-builder.add_edge("order_finder", "eligibility_gate")
-builder.add_conditional_edges("eligibility_gate", route_eligibility, {"eligible": "escalation_gate", "ineligible": "finalize_return"})
-builder.add_edge("escalation_gate", "finalize_return")
-builder.add_edge("finalize_return", END)
-
-graph = builder.compile()
