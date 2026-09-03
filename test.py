@@ -3,4 +3,8 @@ from backend.graph.build_graph import graph
 
 
 if __name__ == '__main__':
-    graph.invoke(default_return_state.copy())
+
+    graph.invoke(
+        default_return_state.copy(),
+        {"configurable": {"thread_id": "1"}}
+    )
