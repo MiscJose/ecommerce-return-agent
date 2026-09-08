@@ -11,7 +11,7 @@ class ReturnState(TypedDict):
    return_reason: str
    order_date: date
    vip_status: bool
-   return_items_total: Decimal
+   total_amount: Decimal
    latest_return_date: date
    reason_category: str
    status: str
@@ -24,7 +24,7 @@ default_return_state = {
    "return_reason": None,
    "order_date": None,
    "vip_status": False,
-   "return_items_total": Decimal('0.0'),
+   "total_amount": Decimal('0.0'),
    "latest_return_date": None,
    "reason_category": None,
    "status": "pending",

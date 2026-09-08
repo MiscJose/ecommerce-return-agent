@@ -24,7 +24,7 @@ app = FastAPI()
 
 @app.get("/orders")
 async def get_order(order_id):
-    con, cur = None, None 
+    conn, cur = None, None 
     try:
         conn = psycopg2.connect(os.getenv("DATABASE_URL"))
         cur = conn.cursor()
@@ -47,6 +47,7 @@ async def get_order(order_id):
 async def start_conversation():
     try:
         thread_id = str(uuid4())
+        # thread_id = 'state-0'
         config = {"configurable": {"thread_id": thread_id}}
         result = await graph.ainvoke(default_return_state.copy(), config)
         return {"thread_id": thread_id, "question": result['__interrupt__'][0].value}
