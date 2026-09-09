@@ -1,6 +1,19 @@
 import os
 import psycopg2
 
+from datetime import date, timedelta
+
+def check_window(order_date, vip_status):
+    latest_return_date = None
+    if vip_status:
+        latest_return_date = order_date + timedelta(days=60)
+    else:
+        latest_return_date = order_date + timedelta(days=30)
+
+    if date.today() <= latest_return_date:
+        return True
+    return False
+
 def find_order(order_id):
     conn, cur = None, None 
     try:

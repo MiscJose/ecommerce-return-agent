@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 
 from typing import TypedDict, Annotated
-from langchain.messages import AnyMessage
+from langchain.messages import AnyMessage, AIMessage
 from langgraph.graph.message import add_messages
 
 class ReturnState(TypedDict):
