@@ -1,7 +1,7 @@
 import os
 import psycopg2
 
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 
 def check_window(order_date, vip_status):
     latest_return_date = None
@@ -10,7 +10,7 @@ def check_window(order_date, vip_status):
     else:
         latest_return_date = order_date + timedelta(days=30)
 
-    if date.today() <= latest_return_date:
+    if datetime.now() <= latest_return_date:
         return True
     return False
 

@@ -1,7 +1,10 @@
 from .state import ReturnState
-from langgraph.types import interrupt, Command
 
 def route_eligibility_gate(state: ReturnState) -> str:
-   print("Function route_eligibility_gate")
 
-   return "eligible"
+   return_reason = state.get('return_reason')
+
+   if return_reason is not None:
+      return "eligible"
+   else:
+      return "ineligible"
