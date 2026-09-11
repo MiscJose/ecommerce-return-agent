@@ -1,5 +1,6 @@
 from .state import ReturnState
-from ..helper import check_window
+from helper import check_window
+
 from langgraph.types import interrupt
 
 def eligibility_gate(state: ReturnState) -> ReturnState:
