@@ -25,9 +25,7 @@ CREATE Table order_items (
 CREATE Table returns (
 	return_id serial primary key not null,
 	order_id int references orders(order_id) not null,
-	item_id int references order_items(item_id) not null,
-	return_quantity int not null,
 	return_amount decimal (12,2) not null,
 	return_status text CHECK (return_status IN ('pending', 'accepted', 'denied')) not null,
-	return_reason text not null
+	return_reason text
 );

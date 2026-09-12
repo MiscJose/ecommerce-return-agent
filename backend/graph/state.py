@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 
 from typing import TypedDict, Annotated
-from langchain.messages import AnyMessage, AIMessage
+from langchain.messages import AnyMessage
 from langgraph.graph.message import add_messages
 
 class ReturnState(TypedDict):
@@ -15,7 +15,7 @@ class ReturnState(TypedDict):
    latest_return_date: date
    reason_category: str
    status: str
-   escalation_reason: str 
+   auto_deny_reason: str
    messages: Annotated[list[AnyMessage], add_messages]
 
 default_return_state = {
@@ -28,7 +28,7 @@ default_return_state = {
    "latest_return_date": None,
    "reason_category": None,
    "status": "pending",
-   "escalation_reason": None,
+   "auto_deny_reason": None,
    "messages": []
 }
 

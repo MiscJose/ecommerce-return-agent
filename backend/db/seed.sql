@@ -7,10 +7,10 @@ INSERT INTO users (email_id, address, total_spend, VIP_status) VALUES
 -- Orders: mix of recent (within a 30-day return window) and older orders
 INSERT INTO orders (user_id, total_amount, order_date) VALUES
 (1, 156.00, NOW() - INTERVAL '5 days'),   -- order_id 1, Emma, recent
-(1, 89.50,  NOW() - INTERVAL '60 days'),  -- order_id 2, Emma, old
-(2, 120.00, NOW() - INTERVAL '10 days'),  -- order_id 3, James, recent
-(3, 210.00, NOW() - INTERVAL '3 days'),   -- order_id 4, Sofia, recent
-(3, 102.75, NOW() - INTERVAL '90 days');  -- order_id 5, Sofia, old
+(2, 89.50,  NOW() - INTERVAL '60 days'),  -- order_id 2, Emma, old
+(3, 120.00, NOW() - INTERVAL '10 days'),  -- order_id 3, James, recent
+(4, 210.00, NOW() - INTERVAL '3 days'),   -- order_id 4, Sofia, recent
+(5, 102.75, NOW() - INTERVAL '90 days');  -- order_id 5, Sofia, old
 
 -- Order items: a few clothing items per order
 INSERT INTO order_items (order_id, item_price, item_quantity, item_total_price) VALUES
@@ -20,8 +20,8 @@ INSERT INTO order_items (order_id, item_price, item_quantity, item_total_price) 
 (4, 70.00, 3, 210.00),   -- item_id 4, sweaters x3
 (5, 34.25, 3, 102.75);   -- item_id 5, socks pack x3
 
--- Returns: one of each status, referencing real order_items above
-INSERT INTO returns (order_id, item_id, return_quantity, return_amount, return_status, return_reason) VALUES
-(1, 1, 1, 78.00,  'pending',  'Item arrived with a broken zipper'),
-(3, 3, 1, 60.00,  'accepted', 'Wrong size shipped'),
-(5, 5, 1, 34.25,  'denied',   'Changed mind, outside return window');
+-- Returns: one of each status
+INSERT INTO returns (order_id, return_amount, return_status, return_reason) VALUES
+(1, 156.00,  'pending',  'Item arrived with a broken zipper'),
+(3, 60.00,  'accepted', 'Wrong size shipped'),
+(5, 34.25,  'denied',   'Changed mind, outside return window');

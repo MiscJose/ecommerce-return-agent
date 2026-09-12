@@ -14,6 +14,6 @@ def eligibility_gate(state: ReturnState) -> ReturnState:
         return {"return_reason": return_reason}
         
     else:
-        return {"status": "denied", "escalation_reason": "return window expired"}
+        return {"status": "denied", "auto_deny_reason": "return window expired"}
    
     
