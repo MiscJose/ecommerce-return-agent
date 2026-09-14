@@ -1,8 +1,9 @@
-from graph.state import default_return_state
-from graph.build_graph import graph
+# from graph.state import default_return_state
+# from graph.build_graph import graph
+from langchain.messages import AIMessage
 
-from helper import find_order, check_window
-from datetime import datetime
+# from helper import find_order, check_window
+# from datetime import datetime
 
 # DATABASE_URL="postgresql://admin:password@localhost:5432/ecommerce_db" python test.py
 
@@ -10,9 +11,12 @@ from datetime import datetime
 
 if __name__ == '__main__':
 
-    order = find_order(1)
-    print(check_window(order['order_date'], True))
+    # order = find_order(1)
+    # print(check_window(order['order_date'], True))
 
+    msg = AIMessage("test", additional_kwargs={"channel": "customer"})
+    print(msg.additional_kwargs)
+    print(msg.additional_kwargs.get("channel"))
     # find_order("banana")
 
     # graph.invoke(
