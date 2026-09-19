@@ -22,6 +22,10 @@ class ResumeRequest(BaseModel):
 
 app = FastAPI()
 
+@app.get("/")
+async def health_check():
+    return {"status": "ok"}
+
 @app.get("/orders")
 async def get_order(order_id):
     conn, cur = None, None 
