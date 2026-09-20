@@ -16,6 +16,9 @@ def finalize_return(state: ReturnState) -> ReturnState:
       cur.execute(query, (order_id, total_amount, status, return_reason))
 
       ai_msg = AIMessage("Have a good day!")
+
+      conn.commit()
+
       return {"messages": [ai_msg]}
 
    except psycopg2.Error as e:

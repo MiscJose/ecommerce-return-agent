@@ -1,6 +1,5 @@
 from .state import ReturnState
 from langgraph.graph import END, START, StateGraph
-from langgraph.checkpoint.memory import InMemorySaver
 
 from .order_finder import order_finder
 from .abandon_session import abandon_session
@@ -9,7 +8,6 @@ from .route_order_finder import route_order_finder
 from .route_eligibility_gate import route_eligibility_gate
 from .escalation_gate import escalation_gate
 from .finalize_return import finalize_return
-
 
 
 builder = StateGraph(ReturnState)
@@ -27,6 +25,6 @@ builder.add_conditional_edges("eligibility_gate", route_eligibility_gate, {"elig
 builder.add_edge("escalation_gate", "finalize_return")
 builder.add_edge("finalize_return", END)
 
-checkpointer = InMemorySaver()
-graph = builder.compile(checkpointer)
+
+
 

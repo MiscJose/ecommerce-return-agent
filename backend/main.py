@@ -1,26 +1,37 @@
+# Standard library
 import os
-
-from fastapi import FastAPI
-import psycopg2
-
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
-
+# Third-party
+from fastapi import FastAPI, Request
+from pydantic import BaseModel
 from dotenv import load_dotenv
-load_dotenv()
-
+import psycopg2
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.types import Command
 
+# Local
 from graph.state import default_return_state
-from graph.build_graph import graph
+from graph.build_graph import builder
 
-from pydantic import BaseModel
+load_dotenv()
+
 
 class ResumeRequest(BaseModel):
-    thread_id: str 
+    thread_id: str
     customer_answer: str
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db_uri = os.getenv("DATABASE_URL")
+    async with AsyncPostgresSaver.from_conn_string(db_uri) as checkpointer:
+        await checkpointer.setup()
+        app.state.graph = builder.compile(checkpointer=checkpointer)
+        yield
+
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 async def health_check():
@@ -48,22 +59,22 @@ async def get_order(order_id):
             conn.close()    
 
 @app.post("/returns/start")
-async def start_conversation():
+async def start_conversation(req: Request):
     try:
         thread_id = str(uuid4())
         # thread_id = 'state-0'
         config = {"configurable": {"thread_id": thread_id}}
-        result = await graph.ainvoke(default_return_state.copy(), config)
+        result = await req.app.state.graph.ainvoke(default_return_state.copy(), config)
         return {"thread_id": thread_id, "question": result['__interrupt__'][0].value}
     except Exception as e:
         return {"Error": str(e)}
 
 @app.post("/returns/resume")
-async def resume_conversation(request: ResumeRequest):
+async def resume_conversation(request: ResumeRequest, req: Request):
     try:
         resume_command = Command(resume=request.customer_answer)
         config = {"configurable": {"thread_id": request.thread_id}}
-        result = await graph.ainvoke(resume_command, config)
+        result = await req.app.state.graph.ainvoke(resume_command, config)
         return {"thread_id": request.thread_id, "result": result}
     except Exception as e:
         return {"Error": str(e)}
