@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from uuid import uuid4
 
 # Third-party
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Header, HTTPException
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import psycopg2
@@ -79,4 +79,31 @@ async def resume_conversation(request: ResumeRequest, req: Request):
     except Exception as e:
         return {"Error": str(e)}
 
+@app.post("/admin/reset-demo")
+async def reset_demo(x_reset_secret: str = Header(None)):
+    if x_reset_secret != os.getenv("RESET_SECRET"):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    else:
+        conn, cur = None, None
+        try:
+            conn = psycopg2.connect(os.getenv("DATABASE_URL"))
+            cur = conn.cursor()
+
+            truncate_query = "TRUNCATE returns RESTART IDENTITY CASCADE;"
+            with open("./reset/re_seed.sql", 'r', encoding='utf-8') as f:
+                re_seed_query =  f.read()
+
+            cur.execute(truncate_query)
+            cur.execute(re_seed_query)
+            conn.commit()
+
+            return {"Status": "Reset Complete"}
+        
+        except psycopg2.Error as e:
+            return {"Error": str(e)}
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
 
