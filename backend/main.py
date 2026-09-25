@@ -116,28 +116,28 @@ async def reset_demo(x_reset_secret: str = Header(None)):
             if conn:
                 conn.close()
 
-ALLOWED_TABLES = ["users", "orders", "order_items", "returns"]
-@app.get("/admin/tables/{table_name}")
-async def get_table(table_name: str):
-    if table_name not in ALLOWED_TABLES:
-        raise HTTPException(status_code=404, detail="Table not found")
+@app.get("/admin/tables/")
+async def get_table():
 
     conn, cur = None, None 
     try:
         conn = psycopg2.connect(os.getenv("DATABASE_URL"))
         cur = conn.cursor()
 
-        query = f"select * from {table_name}"
-        cur.execute(query)
-        rows = cur.fetchall()
+        tables = {}
+        for table in ["users", "orders", "order_items", "returns"]:
+            query = f"select * from {table}"
+            cur.execute(query)
+            rows = cur.fetchall()
 
-        columns = cur.description
-        column_names = [col[0] for col in columns]
+            columns = cur.description
+            column_names = [col[0] for col in columns]
 
-        data = []
-        for row in rows:
-            data.append(dict(zip(column_names, row)))
-        return data
+            data = []
+            for row in rows:
+                data.append(dict(zip(column_names, row)))
+            tables[table] = data
+        return tables
             
     except psycopg2.Error as e:
         return {"Error": str(e)}
