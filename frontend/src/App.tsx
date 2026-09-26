@@ -4,8 +4,13 @@ import './App.css'
 
 
 function App() {
-
-  const [tables, setTables] = useState({"users": [], "orders": [], "order_items": [], "returns": []})
+  
+  const [tables, setTables] = useState<Record<string, Record<string, any>[]>>({
+    users: [],
+    orders: [],
+    order_items: [],
+    returns: []
+  });
 
   useEffect(() => {
     async function getData(){
@@ -26,16 +31,28 @@ function App() {
       </section>
 
       <section>
-        <table>
-          <tr>
-              {tables.users.length > 0 ? (
-                Object.keys(tables.users['0']).map(col => 
-                <th>{col}</th>)
-                ) : (
-                <p>No Users Found!</p>
-              )}
-          </tr>
-        </table>
+        {tables.users.length > 0 ? 
+          (<table>
+            <thead>
+              <tr>
+                  {Object.keys(tables.users['0']).map(col => 
+                    <th key={col}>{col}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {tables.users.map(user =>
+                <tr key={user.user_id}>
+                {Object.entries(user).map(([key, value]) => 
+                  <td key={key}>{value}</td>
+                )}
+                </tr>
+               )}
+            </tbody>
+          </table>
+          ) : (
+            <p>Table Not Found!</p>
+          )
+        }
       </section>
     </>
   )
