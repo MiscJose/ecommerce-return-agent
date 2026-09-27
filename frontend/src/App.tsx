@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
+import { Table } from './Table'
+import { ChatPanel } from './ChatPanel';
 import './App.css'
-
 
 
 function App() {
@@ -30,30 +31,19 @@ function App() {
         <p>Welcome to the App!</p>
       </section>
 
-      <section>
-        {tables.users.length > 0 ? 
-          (<table>
-            <thead>
-              <tr>
-                  {Object.keys(tables.users['0']).map(col => 
-                    <th key={col}>{col}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {tables.users.map(user =>
-                <tr key={user.user_id}>
-                {Object.entries(user).map(([key, value]) => 
-                  <td key={key}>{value}</td>
-                )}
-                </tr>
-               )}
-            </tbody>
-          </table>
-          ) : (
-            <p>Table Not Found!</p>
-          )
-        }
-      </section>
+      <div id='demo'>
+        <section id='chat-panel'>
+          <p>Placeholder for Chat!</p>
+        </section>
+        <section id='tables-panel'>
+          <Table tableName={tables.users} />
+          <Table tableName={tables.orders} />
+          <Table tableName={tables.order_items} />
+          <Table tableName={tables.returns} />
+        </section>
+      </div>
+
+      
     </>
   )
 }

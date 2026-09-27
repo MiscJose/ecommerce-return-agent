@@ -1,0 +1,14 @@
+#demo {
+    display: flex;
+    gap: 1rem;
+}
+
+#chat-panel {
+   flex: 1;
+}
+
+#tables-panel {
+   flex: 1;
+   /* font-size: smaller; */
+   overflow-x: auto
+}
