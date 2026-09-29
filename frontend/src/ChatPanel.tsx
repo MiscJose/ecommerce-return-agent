@@ -17,9 +17,39 @@ export function ChatPanel(){
         }, []
     )
 
+
+    let latest_message = messages[messages.length - 1]
+    let active_channel = null
+
+    if (latest_message==null){
+        active_channel = "customer"
+    }
+    else {
+        active_channel = latest_message.additional_kwargs.channel
+    }
+
+    let manager_channel_messages = messages.filter(message => message.additional_kwargs.channel === "manager")
+    let customer_channel_messages = messages.filter(message => message.additional_kwargs.channel === "customer")
+
     return (
-    
-    <p>This is a placeholder</p>
+
+    <div>
+        <div>
+            <ul>
+                {manager_channel_messages.map((message, index) =>
+                    <li key={index}>{message.content}</li>
+                )}
+            </ul>
+        </div>
+
+        <div>
+            <ul>
+                {customer_channel_messages.map((message, index) =>
+                    <li key={index}>{message.content}</li>
+                )}
+            </ul>
+        </div>
+    </div>
     
     )
 }

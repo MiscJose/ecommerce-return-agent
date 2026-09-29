@@ -33,7 +33,7 @@ function App() {
 
       <div id='demo'>
         <section id='chat-panel'>
-          <p>Placeholder for Chat!</p>
+          <ChatPanel />
         </section>
         <section id='tables-panel'>
           <Table tableName={tables.users} />
