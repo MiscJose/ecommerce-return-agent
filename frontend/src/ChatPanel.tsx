@@ -31,25 +31,57 @@ export function ChatPanel(){
     let manager_channel_messages = messages.filter(message => message.additional_kwargs.channel === "manager")
     let customer_channel_messages = messages.filter(message => message.additional_kwargs.channel === "customer")
 
+    function handleInputChange(e){
+        setInputValue(e.target.value)
+    }
+
+    function handleFormSubmit(){
+        const body = {"thread_id": threadID, "customer_answer": inputValue}
+        useEffect(() => {
+            async function sendChatMessage(){
+                const response = await fetch('http://localhost:8000/returns/resume', {method: "Post", body: JSON.stringify(body)}) 
+                const fetchedData = await response.json()
+                setThreadID(fetchedData.thread_id)
+                setMessages(fetchedData.result.messages)
+                setInputValue('')
+
+                
+            }
+            sendChatMessage
+        }, [])
+    }
+        
+
+
+
     return (
 
-    <div>
-        <div>
-            <ul>
-                {manager_channel_messages.map((message, index) =>
-                    <li key={index}>{message.content}</li>
-                )}
-            </ul>
-        </div>
+        <>
+            <form onSubmit={handleFormSubmit} action="">
+                <input onChange={handleInputChange} type="text" />
+                <button>Submit</button>
+            </form>
 
-        <div>
-            <ul>
-                {customer_channel_messages.map((message, index) =>
-                    <li key={index}>{message.content}</li>
-                )}
-            </ul>
-        </div>
-    </div>
-    
+            <div>
+                <p>INPUT VALUE: {inputValue}</p>
+            </div>
+
+            <div>
+                <ul>
+                    {manager_channel_messages.map((message, index) =>
+                        <li key={index}>{message.content}</li>
+                    )}
+                </ul>
+            </div>
+
+            <div>
+                <ul>
+                    {customer_channel_messages.map((message, index) =>
+                        <li key={index}>{message.content}</li>
+                    )}
+                </ul>
+            </div>
+        </>
+
     )
 }
