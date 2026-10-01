@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ChangeEvent, type FormEvent } from "react";
 
 export function ChatPanel(){
     const [threadID, setThreadID] = useState <string | null>(null)
@@ -31,40 +31,41 @@ export function ChatPanel(){
     let manager_channel_messages = messages.filter(message => message.additional_kwargs.channel === "manager")
     let customer_channel_messages = messages.filter(message => message.additional_kwargs.channel === "customer")
 
-    function handleInputChange(e){
+    function handleInputChange(e : ChangeEvent <HTMLInputElement>){
         setInputValue(e.target.value)
     }
 
-    function handleFormSubmit(){
+   async function handleFormSubmit(e : FormEvent <HTMLFormElement>){
+        e.preventDefault()
         const body = {"thread_id": threadID, "customer_answer": inputValue}
-        useEffect(() => {
-            async function sendChatMessage(){
-                const response = await fetch('http://localhost:8000/returns/resume', {method: "Post", body: JSON.stringify(body)}) 
-                const fetchedData = await response.json()
-                setThreadID(fetchedData.thread_id)
-                setMessages(fetchedData.result.messages)
-                setInputValue('')
-
-                
-            }
-            sendChatMessage
-        }, [])
+        const response = await fetch('http://localhost:8000/returns/resume', {
+            method: "post", 
+            headers: {"Content-Type": "application/JSON"},
+            body: JSON.stringify(body)
+        }) 
+        
+        const fetchedData = await response.json()
+        console.log(fetchedData)
+        setThreadID(fetchedData.thread_id)
+        setMessages(fetchedData.result.messages)
+        setInputValue('')
+        
+        if (!fetchedData.result.__interrupt__ ){
+            setIsComplete(true)
+        }
     }
         
-
-
-
     return (
 
         <>
+            {isComplete ? (
+            <p>Thank you!</p>
+            ) : (
             <form onSubmit={handleFormSubmit} action="">
-                <input onChange={handleInputChange} type="text" />
+                <input onChange={handleInputChange} value={inputValue} type="text" />
                 <button>Submit</button>
             </form>
-
-            <div>
-                <p>INPUT VALUE: {inputValue}</p>
-            </div>
+            )}
 
             <div>
                 <ul>
