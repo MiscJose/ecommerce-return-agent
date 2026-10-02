@@ -74,7 +74,11 @@ async def start_conversation(req: Request):
         # thread_id = 'state-0'
         config = {"configurable": {"thread_id": thread_id}}
         result = await req.app.state.graph.ainvoke(default_return_state.copy(), config)
-        return {"thread_id": thread_id, "question": result['__interrupt__'][0].value}
+        return {
+            "thread_id": thread_id, 
+            "question": result['__interrupt__'][0].value["question"], 
+            "additional_kwargs": result['__interrupt__'][0].value["additional_kwargs"]
+        }
     except Exception as e:
         return {"Error": str(e)}
 

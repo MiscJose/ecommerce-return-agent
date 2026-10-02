@@ -11,9 +11,10 @@ def eligibility_gate(state: ReturnState) -> ReturnState:
     within_window = check_window(order_date, vip_status)
 
     if within_window:
+        additional_kwargs = {"channel": "customer"}
         ai_msg = "What is your return reason?"
-        human_msg = interrupt(ai_msg)
-        messages = [AIMessage(ai_msg, additional_kwargs={"channel": "customer"}), HumanMessage(human_msg, additional_kwargs={"channel": "customer"})]
+        human_msg = interrupt({"question": ai_msg, "additional_kwargs": additional_kwargs})
+        messages = [AIMessage(ai_msg, additional_kwargs=additional_kwargs), HumanMessage(human_msg, additional_kwargs=additional_kwargs)]
         return {"return_reason": human_msg} | {"messages": messages}
         
     else:

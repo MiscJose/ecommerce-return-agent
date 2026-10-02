@@ -11,7 +11,7 @@ export function ChatPanel(){
             const response = await fetch('http://localhost:8000/returns/start', {method:'post'})
             const fetchedResponse = await response.json()
             setThreadID(fetchedResponse['thread_id'])
-            setMessages([{"content": fetchedResponse.question, "type": "ai", "additional_kwargs": {"channel": "customer"}}])
+            setMessages([{"content": fetchedResponse.question, "type": "ai", "additional_kwargs": fetchedResponse.additional_kwargs}])
         }
         startConversation()
         }, []
@@ -40,19 +40,25 @@ export function ChatPanel(){
         const body = {"thread_id": threadID, "customer_answer": inputValue}
         const response = await fetch('http://localhost:8000/returns/resume', {
             method: "post", 
-            headers: {"Content-Type": "application/JSON"},
+            headers: {"Content-Type": "application/json"},
             body: JSON.stringify(body)
         }) 
         
         const fetchedData = await response.json()
-        console.log(fetchedData)
-        setThreadID(fetchedData.thread_id)
-        setMessages(fetchedData.result.messages)
-        setInputValue('')
-        
+
         if (!fetchedData.result.__interrupt__ ){
+            setThreadID(fetchedData.threadID)
+            setMessages(fetchedData.result.messages)
             setIsComplete(true)
+
         }
+        else {
+            setThreadID(fetchedData.thread_id)
+            const new_message = [{"content": fetchedData.result['__interrupt__'][0].value["question"], "type": "ai", "additional_kwargs": fetchedData.result['__interrupt__'][0].value["additional_kwargs"]}]
+            setMessages([...fetchedData.result.messages, ...new_message])
+        }
+
+        setInputValue('')
     }
         
     return (
