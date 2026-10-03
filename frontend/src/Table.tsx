@@ -5,7 +5,7 @@ type TableProps = {
 export function Table({tableName} : TableProps){
     return (
         tableName.length > 0 ? (
-            <table>
+            <table className="border-collapse border border-gray-400">
                 <thead>
                     <tr>
                         {Object.keys(tableName[0]).map(col => 
@@ -16,7 +16,7 @@ export function Table({tableName} : TableProps){
                     {tableName.map((record, index) =>
                     <tr key={index}>
                     {Object.entries(record).map(([key, value]) => 
-                        <td key={key}>{value}</td>
+                        <td key={key} className="border border-gray-300">{value}</td>
                     )}
                     </tr>
                     )}

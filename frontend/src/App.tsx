@@ -24,10 +24,11 @@ function App() {
   }, []);
     
   return (
-    <>
-      <section id="center">
-        <p>Welcome to the App!</p>
-      </section>
+    <div className='bg-white'>
+      <div id="center">
+        <h1 className='text-gray-900'>Welcome to the App!</h1>
+        <h2 className='text-gray-500'>This is a returns ecommerce simulation</h2>
+      </div>
 
       <div id='demo'>
         <section id='chat-panel'>
@@ -40,10 +41,7 @@ function App() {
           <Table tableName={tables.returns} />
         </section>
       </div>
-
-    
-      
-    </>
+    </div>
   )
 }
 
