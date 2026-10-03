@@ -1,93 +1,106 @@
 # E-Commerce Return Negotiator Agent
 
-A deployed, stateful AI agent built with LangGraph and FastAPI that walks a customer through an e-commerce return request, applying business rules (return window, VIP status, dollar thresholds) and pausing for human approval when needed. Deployed end to end on AWS (ECS Fargate + RDS Postgres + ECR).
+A stateful AI agent built with LangGraph and FastAPI that walks a customer through an e-commerce return request, applying business rules (return window, VIP status, dollar thresholds) and pausing for human approval when needed. Backend has been proven live on AWS once (ECS Fargate + RDS Postgres + ECR); currently torn down to zero compute cost while frontend work continues locally. A React + TypeScript + Vite frontend now exists, fully functional locally, not yet deployed.
 
 ## Status
 
-The backend agent is functionally complete and **fully deployed and verified live on AWS**, including a durability test proving conversation state survives a task restart mid-conversation (see "Deployment Progress" below).
+**Backend: functionally complete, proven on AWS once, not currently deployed.**
+**Frontend: functionally complete locally (table viewer + two-panel chat + auto-refresh), not yet deployed, not yet styled.**
 
-All five graph nodes and both routing functions have real logic and have been tested end to end, both locally and against the deployed AWS environment:
+All five graph nodes and both routing functions have real logic, tested locally and previously verified live on AWS:
 
 - `order_finder`: asks for and validates an order ID, with a state-driven retry loop (up to 3 attempts).
 - `eligibility_gate`: checks the return window (order date + 30/60 days depending on VIP status) and either auto-denies or asks for a return reason.
 - `escalation_gate`: checks the return total against a flat $150 threshold and either auto-approves or pauses for human (manager) approval.
-- `finalize_return`: writes the final outcome to the `returns` table in Postgres (now correctly commits the transaction — see Bugs Found and Fixed below).
+- `finalize_return`: writes the final outcome to the `returns` table in Postgres (commits correctly — see Bugs Found and Fixed).
 - `abandon_session`: a terminal node for when a customer fails to provide a valid order ID after 3 attempts.
 - `route_order_finder` (found / retry / exhausted) and `route_eligibility_gate` (eligible / ineligible) handle all conditional branching.
 
-What remains is primarily frontend work: a table viewer, a chat interface, and a demo-reset mechanism (see Next Steps).
-
 ## Tech Stack
 
-- **Database:** Postgres. Locally, containerized via Docker Compose; in AWS, a managed **RDS** instance (`db.t4g.micro`, Single-AZ, gp2, 20 GiB, us-east-1) — live, seeded, and serving the deployed backend. Four business tables (`users`, `orders`, `order_items`, `returns`) plus three LangGraph checkpoint tables (`checkpoints`, `checkpoint_writes`, `checkpoint_blobs`, added by the `PostgresSaver` migration — see below).
-- **Backend:** FastAPI, containerized, deployed to **AWS ECS (Express Mode)** running on Fargate (1 vCPU / 2 GB, `desiredCount` pinned to min=max=1). Image built and pushed to **ECR**. Live Application URL fronted by an auto-provisioned load balancer.
-- **Agent framework:** LangGraph, using a `StateGraph`. **Checkpointer migrated from `InMemorySaver` to `AsyncPostgresSaver`** (see "PostgresSaver Migration" below) — conversation state now persists in Postgres rather than in-process memory, and has been verified to survive an ECS task restart mid-conversation.
-- **Orchestration (local):** Docker Compose, running the `db` and `backend` services on a shared network. Note: the current `docker-compose.yml` only mounts `backend/db` into `/docker-entrypoint-initdb.d` and does not mount a persistent volume for Postgres's own data directory, so local data does not survive a full container teardown/recreate. A named volume (e.g. `pgdata:/var/lib/postgresql/data`) would fix this if local persistence becomes useful.
+- **Database:** Postgres. Locally via Docker Compose; previously RDS in AWS (torn down — see Deployment Progress). Four business tables (`users`, `orders`, `order_items`, `returns`) plus three LangGraph checkpoint tables (`checkpoints`, `checkpoint_writes`, `checkpoint_blobs`).
+- **Backend:** FastAPI, containerized. `psycopg2` for business-logic queries, `psycopg` v3 (via `psycopg[binary]`) for the LangGraph checkpointer specifically — both coexist without conflict.
+- **Agent framework:** LangGraph `StateGraph`, checkpointed via `AsyncPostgresSaver` (migrated off `InMemorySaver` — durability verified via a live ECS task-restart test mid-conversation).
+- **Frontend:** React + TypeScript + Vite, in `frontend/` (sibling to `backend/`, not nested inside it). Styling: Tailwind CSS v4 just set up (via `@tailwindcss/vite` plugin + a single `@import "tailwindcss"` in `index.css`) — application of utility classes to components has not yet begun. Deliberately **not** using shadcn/ui, to keep the dependency surface small for a demo project.
+- **Orchestration (local):** Docker Compose, `db` + `backend` services. `db` has a healthcheck (`pg_isready`) and `backend` waits on `condition: service_healthy`, to avoid a startup race condition that previously caused a connection-refused crash after a full volume reset.
 - **LLM:** Not yet integrated. Planned for reason classification in `eligibility_gate`.
 
-## PostgresSaver Migration (completed)
+## Backend API
 
-Replaced `InMemorySaver` (a plain in-process Python dict — lost on any task restart, and incompatible with running more than one task) with `AsyncPostgresSaver` from the `langgraph-checkpoint-postgres` package, backed by the same RDS instance used for business data.
+- `POST /returns/start` — begins a conversation, returns `{thread_id, question, additional_kwargs}`.
+- `POST /returns/resume` — body `{thread_id, customer_answer}`, returns `{thread_id, result}` where `result` is the full LangGraph state (including `messages` and, if still paused, `__interrupt__`).
+- `GET /orders?order_id=` — single order lookup (has a known SQL-injection issue, see Future Enhancements).
+- `GET /admin/tables/` — returns all four business tables as `{table_name: [{column: value, ...}, ...]}`, for the frontend table viewer. No auth (read-only, low risk).
+- `POST /admin/reset-demo` — gated by an `X-Reset-Secret` header (checked against the `RESET_SECRET` env var). Truncates `returns` + the three checkpoint tables (`RESTART IDENTITY CASCADE`), then re-seeds `returns` from a dedicated SQL file (`backend/reset/re_seed.sql` — deliberately **outside** `backend/db/`, since Postgres's Docker image auto-runs every `.sql` file found in the directory mounted to `docker-entrypoint-initdb.d`, and this file is meant to run on-demand via the endpoint, not at container startup). Does **not** touch `users`/`orders`/`order_items`.
+- CORS middleware is enabled, currently allowing only `http://localhost:5173` (the local Vite dev server origin). **Will need the deployed frontend's origin added once that exists.**
 
-Key structural changes this required:
+## Interrupt Payload Shape (important recent change)
 
-- **`build_graph.py`** no longer compiles the graph. It now only constructs and exports the uncompiled `builder` (the graph's structure/nodes/edges) — compiling requires a live checkpointer connection, which doesn't exist yet at import time.
-- **`main.py`** now opens the Postgres connection and compiles the graph inside a FastAPI `lifespan` context manager, so the connection opens once on app startup, stays open for the life of the process, and closes cleanly on shutdown. The compiled graph is stored on `app.state.graph`, and both route handlers now take an additional `Request` parameter (named `req` to avoid colliding with the existing `ResumeRequest` Pydantic body parameter in `/returns/resume`) to access it.
-- Used **`AsyncPostgresSaver`** (from `langgraph.checkpoint.postgres.aio`), not the sync `PostgresSaver` — required for compatibility with the app's `async def` / `await ...ainvoke(...)` endpoints; pairing an async app with the sync checkpointer would have silently blocked the event loop on every DB call.
-- `requirements.txt` gained two new entries: `langgraph-checkpoint-postgres` (the checkpointer package, which depends on `psycopg` v3 — a separate driver from the `psycopg2-binary` already used elsewhere in the app; both coexist without conflict) and `psycopg[binary]` — required explicitly, since plain `psycopg` has no bundled `libpq` implementation and fails at runtime with `ImportError: no pq wrapper available` otherwise (mirrors the existing reason `psycopg2-binary` rather than plain `psycopg2` is used).
-- `checkpointer.setup()` (awaited, since using the async saver) runs on every app startup — idempotent, creates the three checkpoint tables if they don't already exist, analogous to how `schema.sql` was run once manually for the business tables.
+Every `interrupt(...)` call across the three pausing nodes (`order_finder`, `eligibility_gate`, `escalation_gate`) now passes a **dict**, not a bare string:
+```python
+interrupt({"question": ai_msg, "additional_kwargs": {"channel": "customer"}})  # or "manager" in escalation_gate
+```
+This was a deliberate fix: the frontend's chat UI needs to know which panel (customer vs. manager) a *pending* question belongs to, before that question has been formally appended to `messages` server-side (which only happens once the node resumes). Previously the interrupt's `.value` was a bare question string with no channel info, which only allowed inferring the channel one submission late. `main.py`'s `/returns/start` was updated to match — it now reads `result['__interrupt__'][0].value['question']` and `['additional_kwargs']` instead of treating `.value` as the question text directly.
 
-**Verified via a live durability test against the deployed AWS environment:** started a conversation, paused it at the manager-approval `interrupt()`, manually stopped the running ECS task, waited for the replacement task (from `desiredCount: 1`) to come up, then sent the resume call with the same `thread_id` against the new task. It completed correctly — confirming conversation state now genuinely survives a process restart, which `InMemorySaver` could never have done. This directly strengthens the "multi-turn state persistence" claim for the demo: it's now true across restarts/scaling, not just within one process's uptime.
+## PostgresSaver Migration (completed, prior session)
 
-## State Design Notes
+Replaced `InMemorySaver` with `AsyncPostgresSaver` (`langgraph-checkpoint-postgres` package), backed by the same Postgres instance as business data. Required: `build_graph.py` now only exports the uncompiled `builder` (compiling needs a live checkpointer connection, unavailable at import time); `main.py` opens the connection and compiles the graph inside a FastAPI `lifespan` context manager, storing the result on `app.state.graph`; both route handlers take an additional `Request` parameter (named `req`, to avoid colliding with `ResumeRequest` in `/returns/resume`) to reach it. Verified via a live durability test: paused a conversation at the manager-approval interrupt, manually stopped the running ECS task, waited for the replacement task, resumed with the same `thread_id` — completed correctly.
 
-- `ReturnState.messages` accumulates a full, chronological transcript of every question asked and every answer received across the conversation, using LangGraph's `add_messages` reducer. Every message is tagged via `additional_kwargs={"channel": "customer"}` or `additional_kwargs={"channel": "manager"}`, so a future frontend can filter the transcript by audience.
-- `auto_deny_reason` records why a return was denied automatically by policy (currently only the return-window-expired case in `eligibility_gate`), with no human involved.
-- An earlier `escalation_reason` field (intended to record a human's approve/deny reasoning in `escalation_gate`) was considered and then removed: without actually asking the manager for their reasoning, the field would only have duplicated the `status` field's value.
+## Frontend — Structure and Behavior
 
-## Deployment Progress (AWS)
+Files, all in `frontend/src/`:
+- **`App.tsx`** — top-level layout (two-column flex: `#chat-panel` left, `#tables-panel` right, via `App.css`). Owns `tables` state (`Record<string, Record<string, any>[]>`) and a named, reusable `refreshTables()` function — called once on mount via `useEffect`, and passed down to `ChatPanel` as the `onReturnFinalized` prop so the tables panel can refresh itself automatically the moment a return is finalized, with no manual page reload.
+- **`Table.tsx`** — generic, reusable table component. Takes `tableName: Record<string, any>[]` as a prop (rows of one table — note: the prop name is a holdover and actually holds row *data*, not a name string; worth renaming to something like `rows` during the Tailwind pass). Renders column headers dynamically from `Object.keys()` of the first row, and renders all values generically — no table-specific logic, works identically for all four tables.
+- **`ChatPanel.tsx`** — owns its own state (`threadID`, `messages`, `inputValue`, `isComplete`). On mount, calls `/returns/start` and manually constructs the first message object (since that endpoint doesn't return a full `messages` array). On submit, calls `/returns/resume`; branches on whether `result.__interrupt__` is present: if so, builds one synthetic "pending question" message from the interrupt's `.value` and appends it to `result.messages`; if not, the conversation is done — sets `messages` directly from `result.messages` and flips `isComplete`, which also calls `onReturnFinalized()` (the prop from `App`) to trigger a tables refresh. Renders two independently filtered message lists (`additional_kwargs.channel === "customer"` vs `"manager"`) side by side, so the human-in-the-loop manager-approval exchange is visually distinct from the customer conversation, with one shared input/submit control beneath both.
 
-Stack: **ECS Express Mode** (backend, Fargate) + **RDS** (Postgres) + **ECR** (image registry), chosen over AWS App Runner (sunset April 2026) and over a full manual ECS+VPC+ALB build.
+Known rough edges, not yet addressed:
+- No visual styling at all yet beyond the basic two-column flex layout — this is the immediate next step (Tailwind).
+- No visual indicator of which panel (customer/manager) is currently "active"/awaiting a reply — discussed as a nice-to-have, not yet built.
+- `Table`'s `tableName` prop name is misleading (see above).
+- No loading state distinct from "no rows yet" — `Table Not Found!` fires both while the initial fetch is in flight and if a table is genuinely empty.
 
-**Fully live and verified end to end**, including:
+## Deployment Progress (AWS) — currently torn down
 
-- IAM (`Jose`, `AdministratorAccess` — an initial attachment that silently failed to save was caught and fixed via the root user).
-- RDS instance created, region-matched to ECS (us-east-1), security group opened for both local dev (`/32` IP) and the ECS task's security group.
-- Schema and seed data loaded into RDS, after finding and fixing a real bug in `seed.sql` (mismatched `user_id`/`order_id` values causing FK violations) and trimming an unreachable seeded `'pending'` return row (no code path ever writes that status — it's only the initial placeholder before a real outcome is decided).
-- Backend image built (`--platform linux/amd64`, required since local builds on Apple Silicon default to arm64, which Fargate can't run) and pushed to ECR.
-- Deployed via ECS Express Mode, `desiredCount` pinned to min=max=1 (required while conversation state lived in a single process — now less critical post-`PostgresSaver`, but still sensible to keep at 1 given cost and the demo's scale).
-- Full conversation flow (order lookup → return reason → auto-approve/auto-deny/manager-escalation → finalize) verified live against the deployed URL via curl, for both under- and over-threshold orders.
-- `finalize_return`'s missing `conn.commit()` (see Bugs Found and Fixed) confirmed fixed by checking `returns` row counts in RDS directly before/after a live test.
-- `PostgresSaver` migration verified via the live task-restart durability test described above.
+Stack used: ECS Express Mode (Fargate) + RDS + ECR, in **us-east-1**, account `356712071780`.
 
-**Known, deliberately deferred:**
+**Backend was successfully deployed and fully verified live** earlier (full conversation flow via curl, the `PostgresSaver` durability test, the reset/tables endpoints all confirmed working against the live URL).
 
-- RDS master password is a plaintext ECS environment variable rather than a Secrets Manager reference. Fine for this single-developer account; worth migrating before broader access to the account, or as a "how I'd do this in production" talking point.
-- RDS billing: the account was created after AWS's July 2025 free-tier model change, so this account uses a $100 credit balance rather than always-free resource allowances — RDS usage is billed normally and drawn from credits, not free by default. Config itself (`t4g.micro`, gp2, Single-AZ, Standard-mode monitoring) is already the cheapest reasonable shape; RDS can be stopped between work sessions to pause compute billing (auto-restarts after 7 days if left stopped). ECS Fargate has no free tier at all and is the larger ongoing cost driver — Express Mode enforces a minimum of 1 task, so it cannot be scaled to zero without deleting and later recreating the service.
+**The ECS Express service (`ecommerce-return-agent-2b00`, in the `default` cluster) was deliberately deleted**, since the career fair is still months out and ECS Express Mode's auto-provisioned NAT Gateway + Application Load Balancer were billing continuously (~$10.60/month combined) regardless of whether the ECS task itself was running — a real, easy-to-miss AWS cost pattern. Deleting the Express service cascades cleanup through the NAT Gateway, ALB, target group, security group, listener, CloudWatch log group, and the cluster itself. **RDS and ECR were left untouched** (RDS may have been separately stopped — check current state; ECR still holds the last-pushed image, which **predates** the interrupt-channel restructuring and the `/admin/tables`/`/admin/reset-demo` endpoints, so it is now stale).
+
+**To redeploy later:** re-run ECS Express Mode pointed at a freshly-rebuilt-and-pushed ECR image (the current `backend/` code, not the stale one already in ECR), re-add the new ECS task's security group to RDS's inbound rules (a new SG ID is generated each time), and re-enter `DATABASE_URL` and `RESET_SECRET` as ECS environment variables. None of this is novel work — every bug previously hit in this process (platform mismatch, health-check route, driver version, password URI-encoding, security group wiring) is already fixed in the codebase; what's left is re-executing already-proven steps.
+
+**Known cost-driver reference, for next time:** RDS alone (`db.t4g.micro`, gp2, Single-AZ) is cheap and largely covered by account credits. ECS Fargate compute scales with task uptime. The NAT Gateway + ALB are the ones that bill continuously regardless of task state — a reason to delete the whole Express service (not just scale tasks to 0) during any extended pause.
 
 ## Bugs Found and Fixed Along the Way
 
-- **`abandon_session.py` bad import:** imported `AIMessage` from `.state` (only `AnyMessage` is exported there); should import `AIMessage` directly from `langchain.messages`, matching the pattern used correctly in every other node. This crashed the app at import time and was the cause of ECS repeatedly failing to start any task on first deploy.
-- **`finalize_return.py` missing commit:** the `INSERT` into `returns` executed but was never committed (`psycopg2` defaults to `autocommit=False`), and the connection was never closed on the success path. Completed returns were silently not persisted. Fixed with an explicit `conn.commit()` and a `finally` block closing `cur`/`conn`; the bare `except: return None` should still be replaced with proper logging/re-raise so a node failure doesn't silently return `None` into the graph's state merge.
-- **`seed.sql` FK mismatch:** the `orders` table's seed `INSERT` had `user_id` values that didn't correspond to any real user (only 3 users exist, but `user_id` values 1–5 were used) — the row comments' intent ("order_id 1", "order_id 2"...) had been placed in the wrong column. Fixed by correcting `user_id` to `1, 1, 2, 3, 3` (Emma: orders 1 & 2, James: order 3, Sofia: orders 4 & 5).
-- **RDS password with a `%` character:** a percent sign in the master password was being interpreted by `DATABASE_URL`'s URI parsing as the start of a percent-encoded byte sequence, causing a `UnicodeDecodeError` deep in `psycopg2`. Fixed by choosing a new password avoiding URI-reserved characters (`% @ : / ? # [ ]`).
-- **Missing root health-check route:** ECS Express Mode's load balancer health-checks `/`, which had no handler, causing persistent `503 Service Temporarily Unavailable` responses even once the container was otherwise healthy. Fixed by adding a simple `GET /` health-check route.
-- **`os.get` → `os.getenv`:** an early draft of the `PostgresSaver` migration used the nonexistent `os.get(...)`; `os` has no `.get()` method (that's a dict method) — corrected to `os.getenv("DATABASE_URL")`.
-- **`psycopg[binary]` missing:** `langgraph-checkpoint-postgres` pulls in plain `psycopg` (v3) with no bundled Postgres driver implementation, causing `ImportError: no pq wrapper available` at runtime inside the container (the slim base image has no system `libpq`, and no C/binary extension was installed). Fixed by adding `psycopg[binary]` explicitly to `requirements.txt`.
+- **`abandon_session.py` bad import** — imported `AIMessage` from `.state` instead of `langchain.messages`; crashed the app at import time.
+- **`finalize_return.py` missing commit** — `INSERT` into `returns` was never committed (`psycopg2` defaults to `autocommit=False`); fixed with explicit `conn.commit()` and proper `finally` cleanup.
+- **`seed.sql` FK mismatch** — `orders`' seed `user_id` values didn't match real users; fixed to `1, 1, 2, 3, 3`.
+- **RDS password with a `%` character** — interpreted as a URI percent-encoding escape, causing a `UnicodeDecodeError`; fixed by choosing a password avoiding `% @ : / ? # [ ]`.
+- **Missing root health-check route** — ECS's load balancer health-checks `/`, which had no handler, causing persistent 503s; fixed with a simple `GET /` route.
+- **`psycopg[binary]` missing** — `langgraph-checkpoint-postgres` pulls in plain `psycopg` with no bundled driver implementation; fixed by adding `psycopg[binary]` explicitly.
+- **Docker Compose startup race condition** — `depends_on` without a health condition let `backend` start before Postgres was ready, especially after a full `-v` volume reset; fixed with a `pg_isready` healthcheck and `condition: service_healthy`.
+- **`re_seed.sql` auto-running at container init** — initially placed inside `backend/db/`, which is entirely mounted into Postgres's auto-run init-script directory; ran (and failed) before `schema.sql` had created any tables. Fixed by relocating it outside that mounted path, to `backend/reset/`.
+- **Frontend: stray `<ul>` created per-row instead of once** — several early table/list renders nested a new `<ul>` inside each `.map()` iteration instead of wrapping the `.map()` output in one `<ul>`; fixed by moving the wrapping element outside the `.map()` call.
+- **Frontend: `useEffect`/hooks called outside a component or nested inside other functions** — multiple early attempts (data fetching, and later the chat submit handler) tried to call `useEffect` from inside a plain function or an event handler, violating React's Rules of Hooks; fixed by inlining an `async` helper function directly inside the effect (or, for the submit handler, making the handler itself directly `async` with no `useEffect` involved at all).
+- **Frontend: `fetch` body sent without `Content-Type: application/json`** — caused FastAPI to fail to parse the request as the expected Pydantic model, returning a validation-error shape that didn't match what the frontend expected, surfacing as a confusing `Cannot read properties of undefined` error.
+- **Frontend: chat panel showed the previous question, one submission late** — `result.messages` from `/returns/resume` only reflects state *already committed* server-side; a newly-posed question that caused the current pause hasn't been appended yet (interrupt happens before that node's own message-construction code runs). Fixed by branching on `result.__interrupt__`: if present, manually construct one synthetic "pending" message from its `.value` and append it to `result.messages` before rendering.
 
 ## Next Steps
 
-1. **Demo reset mechanism:** A scoped `POST /admin/reset-demo`-style endpoint to reset the `returns` table and the LangGraph checkpoint tables back to a clean state between demo runs — via `TRUNCATE ... RESTART IDENTITY` plus re-seeding, not a full schema rebuild, and not touching `users`/`orders`/`order_items`. Should be gated (e.g. a shared secret) so it isn't triggerable by an arbitrary visitor to the public URL.
-2. **Frontend table viewer:** Read-only endpoints/views to display all four business tables, so career-fair visitors can see real data and know what order IDs to try.
-3. **Frontend chat interface:** The actual conversational UI wrapping `/returns/start` and `/returns/resume`.
+1. **Tailwind styling** — in progress. Plan: utility classes directly in `Table.tsx` (borders, padding, header styling, per-table titles via a new `name` prop) and `ChatPanel.tsx` (chat-bubble styling, left/right alignment, a visual distinction between customer- and manager-channel messages), plus spacing between the four stacked tables in `App.tsx`. Deliberately scoped to be quick — not chasing pixel-perfect design, animations, or a component library.
+2. **Decide frontend hosting** — not yet explored at all. Options to evaluate: static hosting (S3 + CloudFront is the common AWS-native choice), a second small container/service, or something simpler. This is the one piece of the whole project with zero prior groundwork — worth not underestimating.
+3. **Redeploy backend to AWS** — recreate the ECS Express service from the current (updated) code, re-wire the RDS security group, re-set environment variables. Mechanical, but untested against the post-restructuring code (interrupt channel shape, CORS, the two `/admin/*` endpoints).
+4. **Update CORS** — add the deployed frontend's real origin to `main.py`'s `allow_origins` once step 2 is decided and live.
+5. **Full dry-run rehearsal** — once frontend + backend + RDS are all live together, run the actual demo flow start to finish as its own dedicated session, not an afterthought squeezed in late.
 
 ## Future Enhancements (lower priority / deferred)
 
-- **Langfuse integration:** Observability and evals. Parked for time, not abandoned.
-- **Itemized returns:** The agent currently assumes a customer wants to return an entire order. Asking which specific items are being returned, and computing `return_items_total` from that, is a deferred addition.
-- **LLM-based reason classification:** The lenient-vs-needs-review judgment on a customer's stated return reason is not yet wired in. `reason_category` remains unset until this exists.
-- **Human escalation for exhausted order-ID lookups:** currently ends the session automatically via `abandon_session` rather than pausing for a human to supply a corrected order ID. Deliberate simplification for demo scope.
-- **Manager-facing approval interface:** manager decisions are still simulated via direct `curl`/Postman calls to `/returns/resume`. A real dashboard (pending escalations, its own approve/deny actions, and a way to stay current — polling or SSE/WebSockets — plus likely authentication) is deferred as non-core to demonstrating the agent architecture itself.
-- **Migrate remaining `psycopg2` usage to `psycopg3`:** `psycopg2` is now in maintenance mode; the checkpointer already uses `psycopg` v3, so the rest of the app (`helper.py`, `finalize_return.py`) migrating too would let the database layer become genuinely async, consistent with the app's `async def` endpoints and `graph.ainvoke()` calls (which currently wrap synchronous, blocking `psycopg2` calls under the hood).
-- **SQL injection in `/orders`:** builds its query with an f-string (`f"select * from orders where order_id={order_id}"`) instead of parameterizing like `find_order` correctly does. Low urgency while RDS is locked to a known security group, but should be parameterized before any public exposure.
-- **Secrets Manager for `DATABASE_URL`:** move the RDS password out of a plaintext ECS environment variable, per the note under Deployment Progress above.
+- **Langfuse integration** — observability and evals. Parked for time, not abandoned.
+- **Itemized returns** — currently assumes a customer returns an entire order.
+- **LLM-based reason classification** — `reason_category` remains unset; no LLM wired in yet.
+- **Human escalation for exhausted order-ID lookups** — currently ends via `abandon_session` rather than pausing for human correction. Deliberate demo-scope simplification.
+- **Manager-facing approval interface** — currently simulated via the same chat UI's manager panel, not a separate authenticated interface. A real version would need its own auth and a way to stay current (polling/SSE), deferred as non-core to demonstrating the agent architecture.
+- **Migrate remaining `psycopg2` usage to `psycopg3`** — the checkpointer already uses `psycopg` v3; migrating `helper.py`/`finalize_return.py` too would make the DB layer genuinely async, consistent with the app's `async def` endpoints.
+- **SQL injection in `/orders`** — builds its query with an f-string instead of parameterizing. Low urgency while access is restricted, but should be fixed before any public exposure.
+- **Secrets Manager for `DATABASE_URL`/`RESET_SECRET`** — currently plaintext ECS environment variables. Fine for a single-developer account; worth migrating before broader access, or as a "how I'd do this in production" talking point.
