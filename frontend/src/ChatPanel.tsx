@@ -1,6 +1,10 @@
 import { useState, useEffect, type ChangeEvent, type FormEvent } from "react";
 
-export function ChatPanel(){
+type ChatPanelProps = {
+    onReturnFinalized: () => void
+}
+
+export function ChatPanel({onReturnFinalized} : ChatPanelProps){
     const [threadID, setThreadID] = useState <string | null>(null)
     const [messages, setMessages] = useState <Record<string, any>[]>([])
     const [inputValue, setInputValue] = useState <string>('')
@@ -47,9 +51,11 @@ export function ChatPanel(){
         const fetchedData = await response.json()
 
         if (!fetchedData.result.__interrupt__ ){
-            setThreadID(fetchedData.threadID)
+            setThreadID(fetchedData.thread_id)
             setMessages(fetchedData.result.messages)
             setIsComplete(true)
+
+            onReturnFinalized()
 
         }
         else {

@@ -13,18 +13,16 @@ function App() {
     returns: []
   });
 
-  useEffect(() => {
-    async function getData(){
-      const response = await fetch("http://localhost:8000/admin/tables/")
-      const fetchedData = await response.json()
-      setTables({"users": fetchedData['users'],"orders": fetchedData['orders'],"order_items": fetchedData['order_items'],"returns": fetchedData['returns']})
-    }
-    getData()
-  }, []);
-  
+  async function refreshTables(){
+    const response = await fetch("http://localhost:8000/admin/tables/")
+    const fetchedData = await response.json()
+    setTables({"users": fetchedData['users'],"orders": fetchedData['orders'],"order_items": fetchedData['order_items'],"returns": fetchedData['returns']})
+  }
 
-  console.log(tables)
-  
+  useEffect(() => {
+    refreshTables()
+  }, []);
+    
   return (
     <>
       <section id="center">
@@ -33,7 +31,7 @@ function App() {
 
       <div id='demo'>
         <section id='chat-panel'>
-          <ChatPanel />
+          <ChatPanel onReturnFinalized={refreshTables} />
         </section>
         <section id='tables-panel'>
           <Table tableName={tables.users} />
@@ -43,6 +41,7 @@ function App() {
         </section>
       </div>
 
+    
       
     </>
   )
