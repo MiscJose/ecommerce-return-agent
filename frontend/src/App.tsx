@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Table } from './Table'
 import { ChatPanel } from './ChatPanel';
-import './App.css'
-
 
 function App() {
   
@@ -24,21 +22,28 @@ function App() {
   }, []);
     
   return (
-    <div className='bg-white'>
+    <div className='bg-white min-h-screen gap-4'>
       <div id="center">
-        <h1 className='text-gray-900'>Welcome to the App!</h1>
-        <h2 className='text-gray-500'>This is a returns ecommerce simulation</h2>
+        <h1 className='text-center text-2xl'>Welcome to the App!</h1>
       </div>
 
-      <div id='demo'>
-        <section id='chat-panel'>
+      <div id='demo' className='flex gap-2'>
+        <section id='chat-panel' className='flex-1'>
           <ChatPanel onReturnFinalized={refreshTables} />
         </section>
-        <section id='tables-panel'>
-          <Table tableName={tables.users} />
-          <Table tableName={tables.orders} />
-          <Table tableName={tables.order_items} />
-          <Table tableName={tables.returns} />
+        <section id='tables-panel' className='flex-1 overflow-x-auto'>
+          <div className='my-2'>
+            <Table name='Users' rows={tables.users} />
+          </div>
+          <div className='my-2'>
+            <Table name='Orders' rows={tables.orders} />
+          </div>
+          <div className='my-2'>
+            <Table name='Order Items' rows={tables.order_items} />
+          </div>
+          <div className='my-2'>
+            <Table name='Returns' rows={tables.returns} />
+          </div>
         </section>
       </div>
     </div>

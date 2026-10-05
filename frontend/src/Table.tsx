@@ -1,29 +1,33 @@
 type TableProps = {
-    tableName: Record<string, any>[]
+    name: string
+    rows: Record<string, any>[]
 }
 
-export function Table({tableName} : TableProps){
+export function Table({name, rows} : TableProps){
     return (
-        tableName.length > 0 ? (
-            <table className="border-collapse border border-gray-400">
-                <thead>
-                    <tr>
-                        {Object.keys(tableName[0]).map(col => 
-                        <th key={col}>{col}</th>)}
-                    </tr>
-                </thead>
-                <tbody>
-                    {tableName.map((record, index) =>
-                    <tr key={index}>
-                    {Object.entries(record).map(([key, value]) => 
-                        <td key={key} className="border border-gray-300">{value}</td>
-                    )}
-                    </tr>
-                    )}
-                </tbody>
-            </table>
+        rows.length > 0 ? (
+            <div>
+                <h2 className="text-xl my-2">{name}</h2>
+                <table className="border border-separate text-center">
+                    <thead>
+                        <tr>
+                            {Object.keys(rows[0]).map(col => 
+                            <th key={col} className="border bg-slate-600 text-white p-1">{col}</th>)}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows.map((record, index) =>
+                        <tr key={index}>
+                        {Object.entries(record).map(([key, value]) => 
+                            <td key={key} className="border p-1">{String(value)}</td>
+                        )}
+                        </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
             ) : (
-            <p>Table Not Found!</p>
+            <h2> {name} Table Not Found!</h2>
         )
     )
 }
