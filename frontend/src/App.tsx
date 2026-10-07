@@ -22,12 +22,12 @@ function App() {
   }, []);
     
   return (
-    <div className='bg-white min-h-screen gap-4'>
-      <div id="center">
+    <div className='bg-white min-h-screen'>
+      <div>
         <h1 className='text-center text-2xl'>Welcome to the App!</h1>
       </div>
 
-      <div id='demo' className='flex gap-2'>
+      <div className='flex gap-2'>
         <section id='chat-panel' className='flex-1'>
           <ChatPanel onReturnFinalized={refreshTables} />
         </section>
