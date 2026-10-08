@@ -4,6 +4,7 @@ type ChatPanelProps = {
     onReturnFinalized: () => void
 }
 
+
 export function ChatPanel({onReturnFinalized} : ChatPanelProps){
     const [threadID, setThreadID] = useState <string | null>(null)
     const [messages, setMessages] = useState <Record<string, any>[]>([])
@@ -66,40 +67,49 @@ export function ChatPanel({onReturnFinalized} : ChatPanelProps){
 
         setInputValue('')
     }
+
         
     return (
 
-        <>
-            <div>
-                <ul>
+        <div className="max-w-3/5 mx-auto">
+            <div className="py-4">
+                <h2 className="text-xl py-2">Manager Chat</h2>
+                <ul className="flex flex-col gap-2 px-4 py-4 h-50 bg-slate-800">
                     {manager_channel_messages.map((message, index) =>
-                        <li key={index}>{message.content}</li>
+                        <li className={
+                            `rounded-xl p-1 max-w-4/6 ${message.type == 'ai' ? 
+                                'self-start bg-orange-400' :
+                                ' self-end bg-green-400'} 
+                            `} key={index}>{message.content}</li>
                     )}
                 </ul>
             </div>
 
             <div className="py-4">
-                <ul className="flex flex-col gap-2 px-2 py-4 bg-slate-800">
+                <h2 className="text-xl py-2">Customer Chat</h2>
+                <ul className="flex flex-col gap-2 px-4 py-4 h-70 bg-slate-800">
                     {customer_channel_messages.map((message, index) =>
-                        message.type === 'ai' ? 
-                            (<li className="self-start rounded-xl p-1 bg-red-300" key={index}>{message.content}</li>) : 
-                            (<li className="self-end rounded-xl p-1 bg-blue-300" key={index}>{message.content}</li>)
+                        <li className={
+                            `rounded-xl p-1 max-w-4/6 ${message.type == 'ai' ? 
+                                'self-start bg-orange-400' :
+                                'self-end bg-blue-400'} 
+                            `} key={index}>{message.content}</li>
                     )}
                 </ul>
             </div>
 
                         {isComplete ? (
-            <p>Thank you!</p>
+            <p className="text-red-600 text-xl py-6">Thank you for using this demo!</p>
             ) : (
+
             <div className="flex justify-end px-2 py-4 bg-slate-800">
                 <form className="flex gap-2" onSubmit={handleFormSubmit}>
                     <input className="bg-white" onChange={handleInputChange} value={inputValue} type="text" />
-                    <button className="bg-white px-1 rounded-lg text-slate">Submit</button>
+                    <button className="bg-white px-1 rounded-lg hover:bg-blue-400">Submit</button>
                 </form>
             </div>
-
             )}
-        </>
+        </div>
 
     )
 }
