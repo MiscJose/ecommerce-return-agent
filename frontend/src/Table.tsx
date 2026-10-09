@@ -8,7 +8,7 @@ export function Table({name, rows} : TableProps){
         rows.length > 0 ? (
             <div>
                 <h2 className="text-xl my-2">{name}</h2>
-                <table className="border border-separate text-center">
+                <table className="text-md border border-separate text-center">
                     <thead>
                         <tr>
                             {Object.keys(rows[0]).map(col => 
