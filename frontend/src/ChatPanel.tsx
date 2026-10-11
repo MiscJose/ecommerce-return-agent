@@ -4,7 +4,7 @@ type ChatPanelProps = {
     onReturnFinalized: () => void
 }
 
-const base_url = import.meta.env.VITE_DB_URL 
+const base_url = import.meta.env.VITE_API_URL
 
 export function ChatPanel({onReturnFinalized} : ChatPanelProps){
     const [threadID, setThreadID] = useState <string | null>(null)

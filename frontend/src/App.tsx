@@ -2,6 +2,14 @@ import { useState, useEffect } from 'react'
 import { Table } from './Table'
 import { ChatPanel } from './ChatPanel';
 
+const base_url = import.meta.env.VITE_API_URL
+
+async function fetchData() {
+    const response = await fetch(`${base_url}/admin/tables/`)
+    const fetchedData = await response.json()
+    return fetchedData
+}
+
 function App() {
   
   const [tables, setTables] = useState<Record<string, Record<string, any>[]>>({
@@ -11,15 +19,16 @@ function App() {
     returns: []
   });
 
-  async function refreshTables(){
-    const response = await fetch("http://localhost:8000/admin/tables/")
-    const fetchedData = await response.json()
-    setTables({"users": fetchedData['users'],"orders": fetchedData['orders'],"order_items": fetchedData['order_items'],"returns": fetchedData['returns']})
-  }
-
   useEffect(() => {
-    refreshTables()
+    fetchData().then(data => {
+      setTables(data)
+    })
   }, []);
+
+  async function refreshTables(){
+    const fetchedData = await fetchData()
+    setTables(fetchedData)
+  }
     
   return (
     <div className='bg-white min-h-screen'>
