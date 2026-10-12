@@ -1,6 +1,6 @@
 # E-Commerce Return Negotiator Agent
 
-A stateful AI agent built with LangGraph and FastAPI that walks a customer through an e-commerce return request, applying business rules (return window, VIP status, dollar thresholds) and pausing for human approval when needed. Backend has been proven live on AWS once (ECS Fargate + RDS Postgres + ECR); currently torn down to zero compute cost while frontend work continues locally. A React + TypeScript + Vite frontend exists, fully functional and styled locally (Tailwind), not yet deployed.
+A stateful AI agent built with LangGraph and FastAPI that walks a customer through an e-commerce return request, applying business rules (return window, VIP status, dollar thresholds) and pausing for human approval when needed. Backend has been proven live on AWS once (ECS Fargate + RDS Postgres + ECR) and is currently torn down by design, since hosting it around the clock is costly (see [Hosting and Cost Approach](#hosting-and-cost-approach)). A React + TypeScript + Vite frontend exists, fully functional and styled locally (Tailwind); deploying it as a static site on AWS is the next hosting step.
 
 ## Status
 
@@ -78,19 +78,30 @@ Files, all in `frontend/src/`:
 - ESLint config (`frontend/eslint.config.js`) has `@typescript-eslint/no-explicit-any` (and `react-hooks/set-state-in-effect`) downgraded from errors to warnings to reduce complexity on a first project. The `prefer-const` errors were fixed in code. The remaining 3 `no-explicit-any` warnings (`App.tsx`, `ChatPanel.tsx`, `Table.tsx`) are tracked under Future Enhancements.
 - In development only, `<StrictMode>` (in `main.tsx`) runs each effect twice on mount, so locally `/returns/start` is called twice (creating an orphaned extra LangGraph thread/checkpoint per page load) and `/admin/tables/` is fetched twice. This does not happen in a production build.
 
-## Deployment Progress (AWS) — currently torn down
+## Deployment Progress (AWS) — backend currently torn down
 
 Stack used: ECS Express Mode (Fargate) + RDS + ECR, in **us-east-1**, account `356712071780`.
 
 **Backend was successfully deployed and fully verified live** earlier (full conversation flow via curl, the `PostgresSaver` durability test, the reset/tables endpoints all confirmed working against the live URL).
 
-**The ECS Express service (`ecommerce-return-agent-2b00`, in the `default` cluster) was deliberately deleted**, since the career fair is still months out and ECS Express Mode's auto-provisioned NAT Gateway + Application Load Balancer were billing continuously (~$10.60/month combined) regardless of whether the ECS task itself was running — a real, easy-to-miss AWS cost pattern. Deleting the Express service cascades cleanup through the NAT Gateway, ALB, target group, security group, listener, CloudWatch log group, and the cluster itself. **RDS and ECR were left untouched** (RDS may have been separately stopped — check current state; ECR still holds the last-pushed image, which **predates** the interrupt-channel restructuring and the `/admin/tables`/`/admin/reset-demo` endpoints, so it is now stale).
+**The ECS Express service (`ecommerce-return-agent-2b00`, in the `default` cluster) was deliberately deleted.** The always-on pieces Express Mode provisions (an Application Load Balancer, public IPv4 addresses, and Fargate compute) bill by the hour whether or not anyone is using the app, which makes continuous hosting disproportionately expensive for a portfolio project. Deleting the Express service cascades cleanup through the ALB, target group, security group, listener, CloudWatch log group, and the cluster itself. **RDS and ECR were left in place.** RDS may have been stopped, so check its current state: AWS automatically restarts a stopped RDS instance after 7 days, which silently resumes instance charges. ECR still holds the last-pushed image, which **predates** the interrupt-channel restructuring and the `/admin/tables`/`/admin/reset-demo` endpoints, so it is now stale.
 
-**To redeploy later:** re-run ECS Express Mode pointed at a freshly-rebuilt-and-pushed ECR image (the current `backend/` code, not the stale one already in ECR), re-add the new ECS task's security group to RDS's inbound rules (a new SG ID is generated each time), and re-enter `DATABASE_URL` and `RESET_SECRET` as ECS environment variables. None of this is novel work — every bug previously hit in this process (platform mismatch, health-check route, driver version, password URI-encoding, security group wiring) is already fixed in the codebase; what's left is re-executing already-proven steps.
+**To redeploy later:** re-run ECS Express Mode pointed at a freshly-rebuilt-and-pushed ECR image (the current `backend/` code, not the stale one already in ECR), re-add the ECS service's security group to RDS's inbound rules (Express Mode generates a new security group each time unless you supply your own, so the plan is to create one stable security group, allow it into RDS permanently, and attach it when creating the service), and re-enter `DATABASE_URL` and `RESET_SECRET` as ECS environment variables. None of this is novel work — every bug previously hit in this process (platform mismatch, health-check route, driver version, password URI-encoding, security group wiring) is already fixed in the codebase; what's left is re-executing already-proven steps.
 
-**Known cost-driver reference, for next time:** RDS alone (`db.t4g.micro`, gp2, Single-AZ) is cheap and largely covered by account credits. ECS Fargate compute scales with task uptime. The NAT Gateway + ALB are the ones that bill continuously regardless of task state — a reason to delete the whole Express service (not just scale tasks to 0) during any extended pause.
+**Cost drivers, for next time (qualitative):** the Express service's load balancer, public IPv4 addresses, and Fargate compute all bill by the hour while the service exists, and the load balancer and addresses keep billing even if tasks are scaled to 0, so the whole Express service should be deleted (not just scaled down) during any extended pause. RDS (`db.t4g.micro`, gp2, Single-AZ) bills for instance hours while running and for storage even when stopped. A static frontend on S3 + CloudFront has negligible cost by comparison. Reading Cost Explorer by day and by usage type is the quickest way to see which of these is responsible for a charge.
 
 **Frontend hosting constraint to remember:** a frontend served over HTTPS cannot call a plain-HTTP backend (browsers block this as "mixed content"), so the backend endpoint must be HTTPS. ECS Express Mode provides an HTTPS endpoint, which is a point in its favor.
+
+## Hosting and Cost Approach
+
+Running the whole stack 24/7 is expensive for what it is: the load balancer, public IP addresses, container compute, and database all bill continuously. So the decision is to **keep the live AWS deployment off by default and re-activate it only for live demos** (plus one final end-to-end verification), rather than paying for idle uptime.
+
+- **Always-on front door:** this repository. The README carries the demo recording or GIF, an architecture diagram, screenshots of the live AWS deployment, and local run instructions, so the project can be evaluated without anything running.
+- **Frontend:** a static Vite build, planned for S3 + CloudFront (low-cost enough to leave up). With the backend asleep, the frontend should show a friendly "demo backend is asleep" message instead of failing silently (see Future Enhancements).
+- **Backend, between demos:** the ECS Express service is deleted, RDS is stopped (and re-checked periodically because of the 7-day auto-restart), and the ECR image is kept so re-activation doesn't need a rebuild.
+- **Re-activation runbook (to be written):** start RDS, create the Express service from the ECR image with the stable security group and environment variables, make the frontend point at the new backend URL, confirm CORS, run a test conversation, and tear everything down again afterward.
+- **API URL problem to solve:** Express Mode generates a new endpoint each time the service is recreated, but the frontend currently bakes `VITE_API_URL` in at build time. Options are a runtime `config.json` that the frontend fetches (updated by the runbook, no rebuild needed) or a custom domain pointed at the new load balancer.
+- **Guardrail:** set an AWS Budgets alert before creating any new resources, so a forgotten service can't quietly accumulate charges again.
 
 ## Bugs Found and Fixed Along the Way
 
@@ -112,11 +123,14 @@ Stack used: ECS Express Mode (Fargate) + RDS + ECR, in **us-east-1**, account `3
 
 ## Next Steps
 
-1. **Decide frontend hosting** — the one piece with zero prior groundwork, so treat it as research before touching AWS. Options to compare: S3 + CloudFront (AWS-native standard for static sites; S3 and CloudFront bill separately — confirm line items before creating anything), AWS Amplify Hosting (more managed, deploys from GitHub), or a non-AWS static host (Vercel/Netlify/Cloudflare Pages: often free and fastest, but splits the stack across providers, which matters for the "full-stack cloud deployment" story). Flag costs of any new AWS resource before creating it.
-2. **Redeploy backend to AWS** — rebuild and push a fresh ECR image from the current `backend/` code, recreate the ECS Express service, re-wire the RDS security group, re-set `DATABASE_URL` and `RESET_SECRET`. Untested against the post-restructuring code (interrupt channel shape, CORS, the two `/admin/*` endpoints). Consider making any small backend changes (e.g. the deferred message enhancements below) first, to avoid a second build/push cycle.
-3. **Create `frontend/.env.production`** with the real backend URL, run `npm run build`, and confirm `dist/` contains no `localhost`.
-4. **Update CORS** — add the deployed frontend's real origin to `main.py`'s `allow_origins`.
-5. **Full dry-run rehearsal** — once frontend + backend + RDS are all live together, run the actual demo flow start to finish as its own dedicated session, not an afterthought squeezed in late. Use it to decide how data gets reset between visitors.
+Frontend hosting is decided: **S3 + CloudFront** (AWS-native, keeps the full stack on one provider, and low enough in cost to leave running). Amplify Hosting and non-AWS static hosts were considered and set aside. The plan from here:
+
+1. **Set an AWS Budgets alert**, then **deploy the frontend to S3 + CloudFront** — private S3 bucket read through CloudFront (origin access control), upload the `dist/` build, and decide the API URL strategy (runtime `config.json` vs. rebuild vs. custom domain; see Hosting and Cost Approach). The CloudFront URL it produces is also what the backend's CORS list needs. Confirm each new resource's cost before creating it, and decline optional paid add-ons offered in the console.
+2. **Finish the backend changes before the next image build** so the image is built and pushed once: LLM-based reason classification in `eligibility_gate`, Langfuse observability, and the message fixes under Future Enhancements (outcome messages, messages with no channel).
+3. **Final AWS backend deployment** — rebuild and push a fresh ECR image from the current `backend/` code, create the stable security group and allow it into RDS, recreate the ECS Express service, set `DATABASE_URL` and `RESET_SECRET` (and any new LLM key), and add the CloudFront origin to `main.py`'s `allow_origins`. Untested so far against the post-restructuring code (interrupt channel shape, CORS, the two `/admin/*` endpoints).
+4. **Verify end to end** — build the frontend against the real backend URL and confirm `dist/` contains no `localhost`, run a full conversation (including a manager-approval case), and capture screenshots and a screen recording of the live deployment for the README.
+5. **Tear the backend down again** (delete the Express service, stop RDS, keep ECR and the static frontend) and write the re-activation runbook.
+6. **Polish this README as the showcase** — demo GIF or video, architecture diagram (Mermaid renders natively on GitHub), AWS screenshots, key engineering decisions (human-in-the-loop interrupts, Postgres checkpointing and the restart durability test, the cost trade-off above), and local run steps.
 
 ## Future Enhancements (lower priority / deferred)
 
@@ -139,7 +153,7 @@ Stack used: ECS Express Mode (Fargate) + RDS + ECR, in **us-east-1**, account `3
 ### Code quality
 
 - **Type the frontend** — define shared `Message` (`content`, `type: "ai" | "human"`, `additional_kwargs: { channel: "customer" | "manager" }`) and `Row` (`Record<string, unknown>`) types in a `types.ts` (imported with `import type` because `verbatimModuleSyntax` is on) and replace the three `any`s; then restore `no-explicit-any` to an error. The untyped `response.json()` results will surface follow-on errors to resolve.
-- **Frontend error handling** — `fetchData` and the chat `fetch` calls have no `.catch`/`try`; a backend outage leaves the UI silently empty. `fetchData` is the single place to add it for the tables.
+- **Frontend error handling and a "backend is asleep" state** — `fetchData` and the chat `fetch` calls have no `.catch`/`try`; a backend outage leaves the UI silently empty. Since the backend will normally be torn down between demos, add a clear message ("the demo backend is asleep; see the recording in the README") instead. `fetchData` is the single place to add it for the tables.
 - **Fail loudly on a missing env variable** — throw if `VITE_API_URL` is undefined, so a bad build doesn't produce `undefined/returns/start` requests.
 - **`finalize_return` error path** — returns `None` on a `psycopg2.Error`, but LangGraph expects a state-update dict (or `{}`), so a DB failure surfaces as a confusing graph error instead of a clean message.
 - **SQL injection in `/orders`** — builds its query with an f-string instead of parameterizing. Low urgency while access is restricted, but should be fixed before any public exposure.
