@@ -33,7 +33,7 @@ function App() {
   return (
     <div className='bg-white min-h-screen'>
       <div>
-        <h1 className='text-center text-2xl'>Welcome to the App!</h1>
+        <h1 className='text-center text-2xl'>Welcome to the E-Commerce Return App!</h1>
       </div>
 
       <div className='flex gap-2'>
