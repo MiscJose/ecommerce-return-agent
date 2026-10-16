@@ -1,10 +1,9 @@
 import { useState, useEffect, type ChangeEvent, type FormEvent } from "react";
+import { getApiUrl } from "./config";
 
 type ChatPanelProps = {
     onReturnFinalized: () => void
 }
-
-const base_url = import.meta.env.VITE_API_URL
 
 export function ChatPanel({onReturnFinalized} : ChatPanelProps){
     const [threadID, setThreadID] = useState <string | null>(null)
@@ -14,6 +13,7 @@ export function ChatPanel({onReturnFinalized} : ChatPanelProps){
 
     useEffect(() => {
         async function startConversation(){
+            const base_url = await getApiUrl()
             const response = await fetch(`${base_url}/returns/start`, {method:'post'})
             const fetchedResponse = await response.json()
             setThreadID(fetchedResponse['thread_id'])
@@ -32,6 +32,7 @@ export function ChatPanel({onReturnFinalized} : ChatPanelProps){
 
    async function handleFormSubmit(e : FormEvent <HTMLFormElement>){
         e.preventDefault()
+        const base_url = await getApiUrl()
         const body = {"thread_id": threadID, "customer_answer": inputValue}
         const response = await fetch(`${base_url}/returns/resume`, {
             method: "post", 
