@@ -29,12 +29,19 @@ function App() {
   });
 
   useEffect(() => {
-    fetchData().then(data => setTables(data)).catch(error => setIsBackendUp(false))
+    fetchData().then(data => setTables(data)).catch(error => {
+      console.error(error)
+      setIsBackendUp(false)
+    })
   }, []);
 
-  async function refreshTables(){
-    const fetchedData = await fetchData()
-    setTables(fetchedData)
+  function refreshTables(){
+
+    fetchData().then(data => setTables(data)).catch(error => {
+      console.error(error)
+      setIsBackendUp(false)
+    }) 
+
   }
     
   return (
@@ -46,7 +53,7 @@ function App() {
       {isBackendUp ?  
         (<div className='flex gap-2'>
           <section id='chat-panel' className='flex-1'>
-            <ChatPanel onReturnFinalized={refreshTables} />
+            <ChatPanel onReturnFinalized={refreshTables} onBackendError={() => setIsBackendUp(false)} />
           </section>
           <section id='tables-panel' className='flex-1 overflow-x-auto'>
             <div className='my-2'>

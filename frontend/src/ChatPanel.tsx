@@ -3,9 +3,10 @@ import { getApiUrl } from "./config";
 
 type ChatPanelProps = {
     onReturnFinalized: () => void
+    onBackendError: () => void
 }
 
-export function ChatPanel({onReturnFinalized} : ChatPanelProps){
+export function ChatPanel({onReturnFinalized, onBackendError} : ChatPanelProps){
     const [threadID, setThreadID] = useState <string | null>(null)
     const [messages, setMessages] = useState <Record<string, any>[]>([])
     const [inputValue, setInputValue] = useState <string>('')
@@ -13,12 +14,22 @@ export function ChatPanel({onReturnFinalized} : ChatPanelProps){
 
     useEffect(() => {
         async function startConversation(){
-            const base_url = await getApiUrl()
-            const response = await fetch(`${base_url}/returns/start`, {method:'post'})
-            const fetchedResponse = await response.json()
-            setThreadID(fetchedResponse['thread_id'])
-            setMessages([{"content": fetchedResponse.question, "type": "ai", "additional_kwargs": fetchedResponse.additional_kwargs}])
+            try {
+                const base_url = await getApiUrl()
+                const response = await fetch(`${base_url}/returns/start`, {method:'post'})
+                if (!response.ok) {
+                    throw new Error(`Error: ${response.status}`)
+                }
+                const fetchedResponse = await response.json()
+                setThreadID(fetchedResponse['thread_id'])
+                setMessages([{"content": fetchedResponse.question, "type": "ai", "additional_kwargs": fetchedResponse.additional_kwargs}])
+            }
+            catch (error) {
+                console.error(error)
+                onBackendError()
+            }
         }
+
         startConversation()
         }, []
     )
