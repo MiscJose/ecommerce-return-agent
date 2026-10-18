@@ -2,6 +2,7 @@ fastapi
 uvicorn[standard]
 langgraph 
 langchain
+langchain-openai
 psycopg2-binary
 python-dotenv
 langfuse

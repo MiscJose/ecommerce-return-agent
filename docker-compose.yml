@@ -24,6 +24,8 @@ services:
       - "${MAIN_PORT}:${MAIN_PORT}"
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}"
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      LLM_MODEL: ${LLM_MODEL}
     env_file: 
       - .env
     depends_on:
