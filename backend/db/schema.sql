@@ -27,5 +27,6 @@ CREATE Table returns (
 	order_id int references orders(order_id) not null,
 	return_amount decimal (12,2) not null,
 	return_status text CHECK (return_status IN ('pending', 'accepted', 'denied')) not null,
-	return_reason text
+	return_reason text,
+	return_reason_category text 
 );
