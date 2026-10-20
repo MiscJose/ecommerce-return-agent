@@ -10,14 +10,14 @@ ALLOWED = {"Changed Mind", "Defective", "Incorrect Items Delivered", "Other"}
 # (customer's reason, category we expect)
 CASES = [
     ("I changed my mind, I don't want it anymore", "Changed Mind"),
-    ("It doesn't suit my style after all", "Changed Mind")
-    # ("The screen was cracked when I turned it on", "Defective"),
-    # ("It stopped working after two days", "Defective"),
-    # ("I received the wrong size", "Incorrect Items Delivered"),
-    # ("You sent me a blue one but I ordered black", "Incorrect Items Delivered"),
-    # ("asdf qwerty", "Other"),
-    # ("My cat likes the box more than the product", "Other"),
-    # ("", "Other"),
+    ("It doesn't suit my style after all", "Changed Mind"),
+    ("The screen was cracked when I turned it on", "Defective"),
+    ("It stopped working after two days", "Defective"),
+    ("I received the wrong size", "Incorrect Items Delivered"),
+    ("You sent me a blue one but I ordered black", "Incorrect Items Delivered"),
+    ("asdf qwerty", "Other"),
+    ("My cat likes the box more than the product", "Other"),
+    ("", "Other")
 ]
 
 

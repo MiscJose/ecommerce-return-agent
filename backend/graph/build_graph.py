@@ -8,6 +8,7 @@ from .route_order_finder import route_order_finder
 from .route_eligibility_gate import route_eligibility_gate
 from .escalation_gate import escalation_gate
 from .finalize_return import finalize_return
+from .classify_reason import classify_reason
 
 
 builder = StateGraph(ReturnState)
@@ -15,13 +16,15 @@ builder = StateGraph(ReturnState)
 builder.add_node("order_finder", order_finder)
 builder.add_node("abandon_session", abandon_session)
 builder.add_node("eligibility_gate", eligibility_gate)
+builder.add_node("classify_reason", classify_reason)
 builder.add_node("escalation_gate", escalation_gate)
 builder.add_node("finalize_return", finalize_return)
 
 builder.add_edge(START, "order_finder")
 builder.add_conditional_edges("order_finder", route_order_finder, {"found": "eligibility_gate" , "exhausted": "abandon_session", "retry": "order_finder"})
 builder.add_edge("abandon_session", END)
-builder.add_conditional_edges("eligibility_gate", route_eligibility_gate, {"eligible": "escalation_gate", "ineligible": "finalize_return"})
+builder.add_conditional_edges("eligibility_gate", route_eligibility_gate, {"eligible": "classify_reason", "ineligible": "finalize_return"})
+builder.add_edge("classify_reason", "escalation_gate")
 builder.add_edge("escalation_gate", "finalize_return")
 builder.add_edge("finalize_return", END)
 

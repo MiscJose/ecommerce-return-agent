@@ -46,27 +46,6 @@ app.add_middleware(
 async def health_check():
     return {"status": "ok"}
 
-@app.get("/orders")
-async def get_order(order_id):
-    conn, cur = None, None 
-    try:
-        conn = psycopg2.connect(os.getenv("DATABASE_URL"))
-        cur = conn.cursor()
-
-        cur.execute(f"select * from orders where order_id={order_id}")
-        order = cur.fetchone()
-
-        return order
-
-    except psycopg2.Error as e:
-        return {"Error": str(e)}
-
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()    
-
 @app.post("/returns/start")
 async def start_conversation(req: Request):
     try:
