@@ -19,3 +19,6 @@ docker build -t ecommerce-backend ./backend
 docker run -p 8000:8000 ecommerce-backend
 or
 docker run -p 8000:8000 --env-file ./backend/.env ecommerce-backend
+
+## Misc
+
