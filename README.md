@@ -11,7 +11,7 @@ The backend is kept offline between demos to avoid paying for idle infrastructur
 ![Demo of the return agent](docs/demo.gif)
 
 <!-- TODO: replace the link with your video URL -->
-[▶ Watch the full demo video](https://REPLACE-WITH-VIDEO-LINK)
+[▶ Watch the full demo video](https://youtu.be/-e05KG7Jw30)
 
 The video is recorded against the local Docker Compose setup. The same code runs on AWS (see [Deployed on AWS](#deployed-on-aws)).
 
